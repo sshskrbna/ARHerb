@@ -1,5 +1,6 @@
 # ARHerb
 Herbarium Document Generator
+
 🌿 ARHerb
 ARHerb is a graphical user interface (GUI) application that allows you to generate herbarium specimen labels from an Excel file and save them as a Word document. It supports fungi, mosses, and vascular plants, and can also embed QR codes with Google Maps coordinates.
 
