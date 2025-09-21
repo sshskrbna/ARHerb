@@ -1,6 +1,6 @@
 import sys
-import pandas as pd
 import os
+import pandas as pd
 import qrcode
 from PIL import Image
 from docx import Document
@@ -8,21 +8,22 @@ from docx.shared import Inches, Pt
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog,
-    QLineEdit, QComboBox, QMessageBox, QCheckBox
+    QLineEdit, QComboBox, QMessageBox, QCheckBox, QHBoxLayout
 )
 from PyQt6.QtGui import QFont, QIcon
 from PyQt6.QtCore import Qt
 import requests
 from datetime import datetime
 
+
 def check_for_update():
     url = "https://api.github.com/repos/ssskrbna/ARHerb/releases/latest"
     response = requests.get(url).json()
-    latest_version = response["tag_name"]
+    latest_version = response.get("tag_name", "")
     current_version = "1.0"
 
     if latest_version > current_version:
-        print("Доступно обновление!")
+        print("\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u043e \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435!")
 
 
 def filter_nan(value):
@@ -42,32 +43,34 @@ def generate_qr_code(latitude, longitude, num):
 
 def remove_time_from_date(date_value):
     if isinstance(date_value, datetime):
-        return date_value.date().strftime("%Y-%m-%d")  # Если это datetime, убираем время
+        return date_value.date().strftime("%Y-%m-%d")
     elif isinstance(date_value, str):
         try:
             return datetime.strptime(date_value, "%Y-%m-%d %H:%M:%S").strftime("%Y-%m-%d")
         except ValueError:
-            return date_value  # Если формат не совпадает, оставляем как есть
-    return date_value  # Если это не строка и не datetime, возвращаем как есть
+            return date_value
+    return date_value
 
 
-def add_rows_to_table(dataframe, column, start_row, table, AR, herbarium_type, include_qr):
+def add_rows_to_table(dataframe, column, start_row, table, AR, herbarium_type, include_qr, column_map):
     current_row = start_row
 
     for _, row in dataframe.iterrows():
-        family = filter_nan(row.get('family', ''))
-        species = filter_nan(row.get('species', ''))
-        familyrus = filter_nan(row.get('familyrus', ''))
-        speciesrus = filter_nan(row.get('speciesrus', ''))
-        region = filter_nan(row.get('region', ''))
-        date = remove_time_from_date(filter_nan(row.get('date', '')))
-        point = filter_nan(row.get('point', ''))
-        habitats = filter_nan(row.get('habitats', ''))
-        leg = filter_nan(row.get('leg.', ''))
-        det = filter_nan(row.get('det.', ''))
-        num = filter_nan(row.get('num', ''))
-        latitude = filter_nan(row.get('N', ''))
-        longitude = filter_nan(row.get('E', ''))
+        get = lambda k: filter_nan(row.get(column_map.get(k, k), ''))
+
+        family = get('family')
+        species = get('species')
+        familyrus = get('familyrus')
+        speciesrus = get('speciesrus')
+        region = get('region')
+        date = remove_time_from_date(get('date'))
+        point = get('point')
+        habitats = get('habitats')
+        leg = get('leg.')
+        det = get('det.')
+        num = get('num')
+        latitude = get('N')
+        longitude = get('E')
 
         qr_code_path = generate_qr_code(latitude, longitude, num) if include_qr else ""
 
@@ -76,20 +79,13 @@ def add_rows_to_table(dataframe, column, start_row, table, AR, herbarium_type, i
 
         row_cells = table.rows[current_row].cells
         paragraph = row_cells[column].add_paragraph()
-
-        # Название гербария по центру, жирным шрифтом
         title_run = paragraph.add_run(f"{AR}\n")
         title_run.bold = True
         paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
-        # Остальной текст - выравнивание по ширине
         paragraph = row_cells[column].add_paragraph()
         paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
 
-        # Если выбраны сосудистые растения, добавляем русские названия
-
-
-        # Латинские названия
         paragraph.add_run(f"{family}\n").italic = True
         if herbarium_type == "Vascular plant" and familyrus and speciesrus:
             paragraph.add_run(f"{familyrus}\n").italic = True
@@ -104,9 +100,8 @@ def add_rows_to_table(dataframe, column, start_row, table, AR, herbarium_type, i
 {date}              leg.: {leg}
 № {num}                            det.: {det}
 """)
-        text_run.font.size = Pt(10)  # Настроим размер шрифта
+        text_run.font.size = Pt(10)
 
-        # Вставка QR-кода
         if include_qr and qr_code_path:
             run = paragraph.add_run()
             run.add_picture(qr_code_path, width=Inches(0.5))
@@ -117,6 +112,7 @@ def add_rows_to_table(dataframe, column, start_row, table, AR, herbarium_type, i
 class HerbariumApp(QWidget):
     def __init__(self):
         super().__init__()
+        self.column_fields = {}
         self.initUI()
         self.setWindowIcon(QIcon("logo.ico"))
 
@@ -147,6 +143,25 @@ class HerbariumApp(QWidget):
         self.qr_checkbox = QCheckBox("Include QR Code")
         layout.addWidget(self.qr_checkbox)
 
+        self.custom_fields_checkbox = QCheckBox("🛠 Manual column mapping")
+        self.custom_fields_checkbox.stateChanged.connect(self.toggle_column_fields)
+        layout.addWidget(self.custom_fields_checkbox)
+
+        fields = ["family", "familyrus", "species", "speciesrus", "region", "point", "habitats",
+                  "date", "leg.", "det.", "num", "N", "E"]
+        for field in fields:
+            row = QHBoxLayout()
+            label = QLabel(f"{field} column:")
+            line = QLineEdit()
+            line.setPlaceholderText(f"Default: {field}")
+            row.addWidget(label)
+            row.addWidget(line)
+            layout.addLayout(row)
+            self.column_fields[field] = line
+            line.setVisible(False)
+            label.setVisible(False)
+            self.column_fields[field + '_label'] = label
+
         self.help_button = QPushButton("Help")
         self.help_button.clicked.connect(self.show_help)
         layout.addWidget(self.help_button)
@@ -158,13 +173,21 @@ class HerbariumApp(QWidget):
         self.setLayout(layout)
         self.setWindowTitle("ARHerb")
 
+    def toggle_column_fields(self):
+        visible = self.custom_fields_checkbox.isChecked()
+        for key, field in self.column_fields.items():
+            if isinstance(field, QLineEdit):
+                field.setVisible(visible)
+            else:
+                field.setVisible(visible)
+
     def show_help(self):
         help_text = (
             "1. Select an Excel file containing herbarium data.\n"
             "2. Enter the herbarium name.\n"
-            "3. Choose the type of herbarium specimens (Fungi/Vascular plant/Bryophyta).\n"
-            "4. Click 'Generate' to create the labels.\n"
-            "5. If enabled, QR codes will be generated with location links.\n"
+            "3. Choose the type of herbarium specimens.\n"
+            "4. Optionally define custom column names.\n"
+            "5. Click 'Generate' to create the labels.\n"
             "6. The output file will be saved as a Word document."
         )
         QMessageBox.information(self, "Help", help_text)
@@ -175,6 +198,9 @@ class HerbariumApp(QWidget):
             self.file_label.setText(f"Selected file: {os.path.basename(file_path)}")
             self.file_path = file_path
 
+    def get_column_mapping(self):
+        return {k: self.column_fields[k].text().strip() or k for k in self.column_fields if not k.endswith('_label')}
+
     def process_file(self):
         if not hasattr(self, 'file_path') or not self.file_path:
             QMessageBox.warning(self, "Error", "Please select a file!")
@@ -183,6 +209,7 @@ class HerbariumApp(QWidget):
         AR = self.herbarium_input.text().strip()
         herbarium_type = self.type_combo.currentText()
         include_qr = self.qr_checkbox.isChecked()
+        column_map = self.get_column_mapping() if self.custom_fields_checkbox.isChecked() else {}
 
         if not AR:
             QMessageBox.warning(self, "Error", "Please enter the herbarium name!")
@@ -198,8 +225,8 @@ class HerbariumApp(QWidget):
             first_half = df.iloc[:half_index]
             second_half = df.iloc[half_index:]
 
-            add_rows_to_table(first_half, 0, 0, table, AR, herbarium_type, include_qr)
-            add_rows_to_table(second_half, 1, 0, table, AR, herbarium_type, include_qr)
+            add_rows_to_table(first_half, 0, 0, table, AR, herbarium_type, include_qr, column_map)
+            add_rows_to_table(second_half, 1, 0, table, AR, herbarium_type, include_qr, column_map)
 
             doc_path = os.path.splitext(self.file_path)[0] + '_output.docx'
             doc.save(doc_path)
