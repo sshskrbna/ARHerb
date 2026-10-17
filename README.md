@@ -16,7 +16,18 @@ ARHerb is a desktop application that automates the creation of labels for herbar
 
 ### Download
 
-A ready-made Windows build (`ARHerb.exe`) is available on the [Releases](https://github.com/sshskrbna/ARHerb/releases) page. The app tells you when a newer release is out.
+Ready-made builds are on the [Releases](https://github.com/sshskrbna/ARHerb/releases) page. The app tells you when a newer release is out.
+
+- **Windows**: download `ARHerb-windows.exe` and run it.
+- **macOS** (Apple Silicon, M1 and newer): download `ARHerb-macos-arm64.zip`, unzip it and move `ARHerb.app` to Applications. The app is not signed by Apple, so on first launch macOS will block it: open **System Settings → Privacy & Security** and click **Open Anyway**.
+- **Linux** (x86_64): download `ARHerb-linux-x86_64.tar.gz`, then:
+
+  ```bash
+  tar -xzf ARHerb-linux-x86_64.tar.gz
+  ./ARHerb
+  ```
+
+  If it fails with an error about the `xcb` plugin, install `libxcb-cursor0` (Debian/Ubuntu: `sudo apt install libxcb-cursor0`).
 
 ### Run from source
 
@@ -55,6 +66,17 @@ Empty cells are allowed. The output is saved next to the source file as `<name>_
 
 Python, PyQt6, pandas + openpyxl, python-docx, qrcode + Pillow.
 
+### Releasing
+
+Bump `__version__` in `main.py`, commit, then push a tag with the same value:
+
+```bash
+git tag 1.2.0
+git push origin 1.2.0
+```
+
+GitHub Actions builds Windows, macOS and Linux binaries and publishes them as a release.
+
 ### Contributing
 
 Found a bug or have an idea? Please open an [Issue](https://github.com/sshskrbna/ARHerb/issues).
@@ -73,7 +95,18 @@ ARHerb — десктопное приложение для автоматиче
 
 ### Скачать
 
-Готовая сборка для Windows (`ARHerb.exe`) лежит на странице [Releases](https://github.com/sshskrbna/ARHerb/releases). Приложение само сообщает о выходе новой версии.
+Готовые сборки лежат на странице [Releases](https://github.com/sshskrbna/ARHerb/releases). Приложение само сообщает о выходе новой версии.
+
+- **Windows**: скачайте `ARHerb-windows.exe` и запустите.
+- **macOS** (Apple Silicon, M1 и новее): скачайте `ARHerb-macos-arm64.zip`, распакуйте и перенесите `ARHerb.app` в «Программы». Приложение не подписано Apple, поэтому при первом запуске macOS его заблокирует: откройте **Системные настройки → Конфиденциальность и безопасность** и нажмите **Всё равно открыть**.
+- **Linux** (x86_64): скачайте `ARHerb-linux-x86_64.tar.gz`, затем:
+
+  ```bash
+  tar -xzf ARHerb-linux-x86_64.tar.gz
+  ./ARHerb
+  ```
+
+  Если появится ошибка про плагин `xcb`, установите `libxcb-cursor0` (Debian/Ubuntu: `sudo apt install libxcb-cursor0`).
 
 ### Запуск из исходников
 
@@ -111,6 +144,17 @@ python main.py
 ### Технологии
 
 Python, PyQt6, pandas + openpyxl, python-docx, qrcode + Pillow.
+
+### Выпуск новой версии
+
+Поднимите `__version__` в `main.py`, закоммитьте и запушьте тег с тем же номером:
+
+```bash
+git tag 1.2.0
+git push origin 1.2.0
+```
+
+GitHub Actions соберёт версии для Windows, macOS и Linux и опубликует релиз.
 
 ### Участие в разработке
 
