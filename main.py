@@ -24,7 +24,7 @@ from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkRepl
 import updater
 
 
-__version__ = "1.1.3"
+__version__ = "1.2.0"
 # The environment override exists only to test updates against a local server
 RELEASES_URL = os.environ.get(
     "ARHERB_RELEASES_URL", "https://api.github.com/repos/sshskrbna/ARHerb/releases/latest")
