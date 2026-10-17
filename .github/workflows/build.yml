@@ -1,0 +1,98 @@
+name: Build
+
+# Pull requests: test and build on every OS, binaries are attached to the run.
+# Pushing a tag (e.g. 1.2.0): same, then the binaries are published as a GitHub Release.
+on:
+  push:
+    tags: ["*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            asset: ARHerb-windows.exe
+          - os: macos-latest
+            asset: ARHerb-macos-arm64.zip
+          # Older Ubuntu = older glibc, so the binary runs on more distributions
+          - os: ubuntu-22.04
+            asset: ARHerb-linux-x86_64.tar.gz
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Check tag matches __version__
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          version=$(python -c "import ast; print(next(n.value.value for n in ast.parse(open('main.py').read()).body if isinstance(n, ast.Assign) and n.targets[0].id == '__version__'))")
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match __version__ = $version in main.py"
+            exit 1
+          fi
+
+      - name: Install Qt runtime libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon0 libgl1
+
+      - name: Smoke test
+        run: python tests/smoke_test.py
+
+      - name: Build
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            pyinstaller --noconfirm --windowed --name ARHerb --hidden-import openpyxl \
+              --osx-bundle-identifier com.sshskrbna.arherb main.py
+            ditto -c -k --keepParent dist/ARHerb.app "${{ matrix.asset }}"
+          elif [ "$RUNNER_OS" = "Windows" ]; then
+            pyinstaller --noconfirm --windowed --onefile --name ARHerb --hidden-import openpyxl main.py
+            mv dist/ARHerb.exe "${{ matrix.asset }}"
+          else
+            pyinstaller --noconfirm --windowed --onefile --name ARHerb --hidden-import openpyxl main.py
+            tar -czf "${{ matrix.asset }}" -C dist ARHerb
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" assets/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" assets/* --title "ARHerb $GITHUB_REF_NAME" --generate-notes
+          fi

@@ -1,9 +1,14 @@
 import sys
 import os
+import json
+from io import BytesIO
+from datetime import datetime
+
 import pandas as pd
 import qrcode
-from PIL import Image
 from docx import Document
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from PyQt6.QtWidgets import (
@@ -11,34 +16,56 @@ from PyQt6.QtWidgets import (
     QLineEdit, QComboBox, QMessageBox, QCheckBox, QHBoxLayout
 )
 from PyQt6.QtGui import QFont, QIcon
-from PyQt6.QtCore import Qt
-import requests
-from datetime import datetime
+from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 
 
-def check_for_update():
-    url = "https://api.github.com/repos/ssskrbna/ARHerb/releases/latest"
-    response = requests.get(url).json()
-    latest_version = response.get("tag_name", "")
-    current_version = "1.0"
+__version__ = "1.1.3"
+RELEASES_URL = "https://api.github.com/repos/sshskrbna/ARHerb/releases/latest"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-    if latest_version > current_version:
-        print("\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u043e \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435!")
+FIELDS = ["family", "familyrus", "species", "speciesrus", "region", "point", "habitats",
+          "date", "leg.", "det.", "num", "N", "E"]
+
+
+def parse_version(version):
+    parts = []
+    for part in version.lstrip("vV").split("."):
+        digits = "".join(ch for ch in part if ch.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
 
 
 def filter_nan(value):
     return value if pd.notna(value) else ''
 
 
-def generate_qr_code(latitude, longitude, num):
-    if latitude and longitude:
-        google_maps_url = f"https://www.google.com/maps?q={latitude},{longitude}"
-        qr = qrcode.make(google_maps_url)
-        qr_path = f"qr_codes/qr_{num}.png"
-        os.makedirs("qr_codes", exist_ok=True)
-        qr.save(qr_path)
-        return qr_path
-    return ""
+def format_num(value):
+    # pandas reads an integer column with gaps as float: 12 -> 12.0
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def parse_coordinate(value):
+    if value == '' or value is None:
+        return None
+    try:
+        return float(str(value).strip().replace(',', '.'))
+    except ValueError:
+        return None
+
+
+def generate_qr_code(latitude, longitude):
+    lat = parse_coordinate(latitude)
+    lon = parse_coordinate(longitude)
+    if lat is None or lon is None:
+        return None
+    google_maps_url = f"https://www.google.com/maps?q={lat},{lon}"
+    buffer = BytesIO()
+    qrcode.make(google_maps_url).save(buffer, format="PNG")
+    buffer.seek(0)
+    return buffer
 
 
 def remove_time_from_date(date_value):
@@ -50,6 +77,13 @@ def remove_time_from_date(date_value):
         except ValueError:
             return date_value
     return date_value
+
+
+def prevent_row_split(row):
+    # Keep each label on a single page
+    tr_pr = row._tr.get_or_add_trPr()
+    cant_split = OxmlElement('w:cantSplit')
+    tr_pr.append(cant_split)
 
 
 def add_rows_to_table(dataframe, column, start_row, table, AR, herbarium_type, include_qr, column_map):
@@ -68,43 +102,44 @@ def add_rows_to_table(dataframe, column, start_row, table, AR, herbarium_type, i
         habitats = get('habitats')
         leg = get('leg.')
         det = get('det.')
-        num = get('num')
+        num = format_num(get('num'))
         latitude = get('N')
         longitude = get('E')
 
-        qr_code_path = generate_qr_code(latitude, longitude, num) if include_qr else ""
+        qr_code = generate_qr_code(latitude, longitude) if include_qr else None
 
         while len(table.rows) <= current_row:
-            table.add_row()
+            prevent_row_split(table.add_row())
 
-        row_cells = table.rows[current_row].cells
-        paragraph = row_cells[column].add_paragraph()
-        title_run = paragraph.add_run(f"{AR}\n")
+        cell = table.rows[current_row].cells[column]
+        paragraph = cell.paragraphs[0]
+        title_run = paragraph.add_run(AR)
         title_run.bold = True
         paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
-        paragraph = row_cells[column].add_paragraph()
+        paragraph = cell.add_paragraph()
         paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
 
         paragraph.add_run(f"{family}\n").italic = True
-        if herbarium_type == "Vascular plant" and familyrus and speciesrus:
+        if herbarium_type == "Vascular plant" and familyrus:
             paragraph.add_run(f"{familyrus}\n").italic = True
 
         paragraph.add_run(f"{species}\n").italic = True
-        if herbarium_type == "Vascular plant" and familyrus and speciesrus:
+        if herbarium_type == "Vascular plant" and speciesrus:
             paragraph.add_run(f"{speciesrus}\n").italic = True
 
+        location = ", ".join(str(part) for part in (region, point, habitats) if str(part).strip())
         text_run = paragraph.add_run(f"""
-{region}, {point}, {habitats}
+{location}
 
 {date}              leg.: {leg}
 № {num}                            det.: {det}
 """)
         text_run.font.size = Pt(10)
 
-        if include_qr and qr_code_path:
+        if qr_code:
             run = paragraph.add_run()
-            run.add_picture(qr_code_path, width=Inches(0.5))
+            run.add_picture(qr_code, width=Inches(0.5))
 
         current_row += 1
 
@@ -112,9 +147,11 @@ def add_rows_to_table(dataframe, column, start_row, table, AR, herbarium_type, i
 class HerbariumApp(QWidget):
     def __init__(self):
         super().__init__()
+        self.file_path = None
         self.column_fields = {}
         self.initUI()
-        self.setWindowIcon(QIcon("logo.ico"))
+        self.setWindowIcon(QIcon(os.path.join(BASE_DIR, "logo.ico")))
+        self.check_for_update()
 
     def initUI(self):
         layout = QVBoxLayout()
@@ -147,9 +184,7 @@ class HerbariumApp(QWidget):
         self.custom_fields_checkbox.stateChanged.connect(self.toggle_column_fields)
         layout.addWidget(self.custom_fields_checkbox)
 
-        fields = ["family", "familyrus", "species", "speciesrus", "region", "point", "habitats",
-                  "date", "leg.", "det.", "num", "N", "E"]
-        for field in fields:
+        for field in FIELDS:
             row = QHBoxLayout()
             label = QLabel(f"{field} column:")
             line = QLineEdit()
@@ -170,16 +205,42 @@ class HerbariumApp(QWidget):
         self.submit_button.clicked.connect(self.process_file)
         layout.addWidget(self.submit_button)
 
+        self.update_label = QLabel()
+        self.update_label.setOpenExternalLinks(True)
+        self.update_label.setVisible(False)
+        layout.addWidget(self.update_label)
+
         self.setLayout(layout)
-        self.setWindowTitle("ARHerb")
+        self.setWindowTitle(f"ARHerb {__version__}")
+
+    def check_for_update(self):
+        # Asynchronous, so a slow or missing network never blocks the window
+        self.network = QNetworkAccessManager(self)
+        self.network.finished.connect(self.on_update_reply)
+        request = QNetworkRequest(QUrl(RELEASES_URL))
+        request.setTransferTimeout(5000)
+        self.network.get(request)
+
+    def on_update_reply(self, reply):
+        try:
+            if reply.error() != QNetworkReply.NetworkError.NoError:
+                return
+            release = json.loads(bytes(reply.readAll()).decode("utf-8"))
+            latest_version = release.get("tag_name", "")
+            if latest_version and parse_version(latest_version) > parse_version(__version__):
+                url = release.get("html_url", "")
+                self.update_label.setText(
+                    f'Update available: <a href="{url}">{latest_version}</a>')
+                self.update_label.setVisible(True)
+        except (ValueError, AttributeError):
+            pass
+        finally:
+            reply.deleteLater()
 
     def toggle_column_fields(self):
         visible = self.custom_fields_checkbox.isChecked()
-        for key, field in self.column_fields.items():
-            if isinstance(field, QLineEdit):
-                field.setVisible(visible)
-            else:
-                field.setVisible(visible)
+        for field in self.column_fields.values():
+            field.setVisible(visible)
 
     def show_help(self):
         help_text = (
@@ -188,7 +249,9 @@ class HerbariumApp(QWidget):
             "3. Choose the type of herbarium specimens.\n"
             "4. Optionally define custom column names.\n"
             "5. Click 'Generate' to create the labels.\n"
-            "6. The output file will be saved as a Word document."
+            "6. The output file will be saved as a Word document.\n\n"
+            "Default columns: " + ", ".join(FIELDS) + "\n"
+            "N and E are latitude and longitude in decimal degrees."
         )
         QMessageBox.information(self, "Help", help_text)
 
@@ -199,10 +262,30 @@ class HerbariumApp(QWidget):
             self.file_path = file_path
 
     def get_column_mapping(self):
-        return {k: self.column_fields[k].text().strip() or k for k in self.column_fields if not k.endswith('_label')}
+        return {k: self.column_fields[k].text().strip() or k for k in FIELDS}
+
+    def confirm_missing_columns(self, df, column_map, herbarium_type, include_qr):
+        expected = [f for f in FIELDS if f not in ("familyrus", "speciesrus")]
+        if herbarium_type == "Vascular plant":
+            expected += ["familyrus", "speciesrus"]
+        if not include_qr:
+            expected = [f for f in expected if f not in ("N", "E")]
+
+        missing = [column_map.get(f, f) for f in expected if column_map.get(f, f) not in df.columns]
+        if not missing:
+            return True
+
+        answer = QMessageBox.question(
+            self, "Missing columns",
+            "These columns were not found in the file and will be left empty:\n"
+            + ", ".join(missing)
+            + "\n\nColumns in the file: " + ", ".join(map(str, df.columns))
+            + "\n\nContinue anyway?"
+        )
+        return answer == QMessageBox.StandardButton.Yes
 
     def process_file(self):
-        if not hasattr(self, 'file_path') or not self.file_path:
+        if not self.file_path:
             QMessageBox.warning(self, "Error", "Please select a file!")
             return
 
@@ -215,23 +298,34 @@ class HerbariumApp(QWidget):
             QMessageBox.warning(self, "Error", "Please enter the herbarium name!")
             return
 
+        doc_path = os.path.splitext(self.file_path)[0] + '_output.docx'
         try:
             df = pd.read_excel(self.file_path)
+            if df.empty:
+                QMessageBox.warning(self, "Error", "The Excel file has no data rows.")
+                return
+            if not self.confirm_missing_columns(df, column_map, herbarium_type, include_qr):
+                return
+
             doc = Document()
             table = doc.add_table(rows=1, cols=2)
             table.style = 'Table Grid'
+            prevent_row_split(table.rows[0])
 
-            half_index = len(df) // 2
+            half_index = (len(df) + 1) // 2
             first_half = df.iloc[:half_index]
             second_half = df.iloc[half_index:]
 
             add_rows_to_table(first_half, 0, 0, table, AR, herbarium_type, include_qr, column_map)
             add_rows_to_table(second_half, 1, 0, table, AR, herbarium_type, include_qr, column_map)
 
-            doc_path = os.path.splitext(self.file_path)[0] + '_output.docx'
             doc.save(doc_path)
 
             QMessageBox.information(self, "Success", f"Document saved: {doc_path}")
+        except PermissionError:
+            QMessageBox.critical(
+                self, "Error",
+                f"Cannot write {doc_path}.\nClose the file in Word and try again.")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred: {e}")
 
