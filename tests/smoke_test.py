@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 import pandas as pd
 from docx import Document
+from PyQt6.QtCore import QSettings
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 import main
@@ -33,6 +34,8 @@ def run():
         "E": [37.6, 0.0, 36.1],
     }).to_excel(xlsx, index=False)
 
+    # Keep the test away from the real user settings
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tmp)
     app = QApplication([])
     errors = []
     QMessageBox.information = lambda *a: None
@@ -42,7 +45,7 @@ def run():
     window = main.HerbariumApp()
     window.file_path = xlsx
     window.herbarium_input.setText("AR Herbarium")
-    window.type_combo.setCurrentText("Vascular plant")
+    window.set_herbarium_type("Vascular plant")
     window.qr_checkbox.setChecked(True)
     window.process_file()
     assert not errors, errors
@@ -57,6 +60,8 @@ def run():
     images = lambda cell: len(cell._element.xpath(".//pic:pic"))
     assert images(rosa) == 1 and images(poa) == 1  # "55,75" and 0/0 both give a QR
     assert images(trifolium) == 0  # no latitude -> no QR
+    for mode in main.THEME_MODES:  # every theme stylesheet must format cleanly
+        window.cycle_theme()
     assert main.parse_version("1.10") > main.parse_version("1.9")
     app.quit()
     print("smoke test passed")
