@@ -41,7 +41,7 @@ jobs:
       - name: Check tag matches __version__
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          version=$(python -c "import ast; print(next(n.value.value for n in ast.parse(open('main.py').read()).body if isinstance(n, ast.Assign) and n.targets[0].id == '__version__'))")
+          version=$(python -c "import ast; print(next(n.value.value for n in ast.parse(open('main.py', encoding='utf-8').read()).body if isinstance(n, ast.Assign) and n.targets[0].id == '__version__'))")
           if [ "$version" != "$GITHUB_REF_NAME" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match __version__ = $version in main.py"
             exit 1
