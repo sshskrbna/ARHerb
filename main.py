@@ -21,9 +21,13 @@ from PyQt6.QtGui import QIcon, QPalette, QColor, QPixmap, QPainter, QPen, QPolyg
 from PyQt6.QtCore import Qt, QUrl, QSettings, QPointF
 from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 
+import updater
+
 
 __version__ = "1.1.3"
-RELEASES_URL = "https://api.github.com/repos/sshskrbna/ARHerb/releases/latest"
+# The environment override exists only to test updates against a local server
+RELEASES_URL = os.environ.get(
+    "ARHERB_RELEASES_URL", "https://api.github.com/repos/sshskrbna/ARHerb/releases/latest")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ICON_DIR = tempfile.mkdtemp(prefix="arherb-")
 atexit.register(shutil.rmtree, ICON_DIR, ignore_errors=True)
@@ -209,6 +213,7 @@ QToolButton#themeButton {{
     padding: 5px 12px; color: {muted};
 }}
 QToolButton#themeButton:hover {{ border: 1px solid {accent}; color: {text}; }}
+QFrame#updateBanner {{ background: {accent_soft}; border: 1px solid {accent}; border-radius: 10px; }}
 QCheckBox {{ spacing: 10px; background: transparent; }}
 QCheckBox::indicator {{
     width: 16px; height: 16px; border: 1px solid {border_strong}; border-radius: 5px;
@@ -334,6 +339,22 @@ class HerbariumApp(QWidget):
         header.addWidget(self.theme_button, alignment=Qt.AlignmentFlag.AlignTop)
         layout.addLayout(header)
 
+        self.update_banner = QFrame()
+        self.update_banner.setObjectName("updateBanner")
+        banner = QHBoxLayout(self.update_banner)
+        banner.setContentsMargins(14, 8, 8, 8)
+        self.update_label = QLabel()
+        self.update_label.setOpenExternalLinks(True)
+        self.update_label.setWordWrap(True)
+        banner.addWidget(self.update_label, 1)
+        self.restart_button = QPushButton("Restart now")
+        self.restart_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.restart_button.clicked.connect(self.restart_with_update)
+        self.restart_button.setVisible(False)
+        banner.addWidget(self.restart_button)
+        self.update_banner.setVisible(False)
+        layout.addWidget(self.update_banner)
+
         card, card_layout = self.make_card(1, "Source file")
         self.file_button = QPushButton()
         self.file_button.setObjectName("dropZone")
@@ -405,10 +426,6 @@ class HerbariumApp(QWidget):
         layout.addWidget(card)
 
         footer = QHBoxLayout()
-        self.update_label = QLabel()
-        self.update_label.setOpenExternalLinks(True)
-        self.update_label.setVisible(False)
-        footer.addWidget(self.update_label)
         footer.addStretch()
         self.help_button = QPushButton("Help")
         self.help_button.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -493,14 +510,24 @@ class HerbariumApp(QWidget):
             event.acceptProposedAction()
         repolish(self.file_button)
 
-
     def check_for_update(self):
         # Asynchronous, so a slow or missing network never blocks the window
         self.network = QNetworkAccessManager(self)
-        self.network.finished.connect(self.on_update_reply)
-        request = QNetworkRequest(QUrl(RELEASES_URL))
-        request.setTransferTimeout(5000)
-        self.network.get(request)
+        self.pending_update = None
+        QApplication.instance().aboutToQuit.connect(self.install_pending_update)
+        reply = self.network.get(self.make_request(RELEASES_URL, timeout=5000))
+        reply.finished.connect(lambda: self.on_update_reply(reply))
+
+    def make_request(self, url, timeout):
+        request = QNetworkRequest(QUrl(url))
+        request.setHeader(QNetworkRequest.KnownHeaders.UserAgentHeader, f"ARHerb/{__version__}")
+        request.setTransferTimeout(timeout)
+        return request
+
+    def show_update_message(self, html, restart=False):
+        self.update_label.setText(html)
+        self.restart_button.setVisible(restart)
+        self.update_banner.setVisible(True)
 
     def on_update_reply(self, reply):
         try:
@@ -508,15 +535,64 @@ class HerbariumApp(QWidget):
                 return
             release = json.loads(bytes(reply.readAll()).decode("utf-8"))
             latest_version = release.get("tag_name", "")
-            if latest_version and parse_version(latest_version) > parse_version(__version__):
+            if not latest_version or parse_version(latest_version) <= parse_version(__version__):
+                return
+            asset = updater.find_asset(release)
+            if asset and updater.can_self_update():
+                self.download_update(asset, release)
+            else:
                 url = release.get("html_url", "")
-                self.update_label.setText(
-                    f'Update available: <a href="{url}">{latest_version}</a>')
-                self.update_label.setVisible(True)
+                self.show_update_message(
+                    f'ARHerb {latest_version} is available: <a href="{url}">download it here</a>')
         except (ValueError, AttributeError):
             pass
         finally:
             reply.deleteLater()
+
+    def download_update(self, asset, release):
+        version = release["tag_name"]
+        self.show_update_message(f"Downloading ARHerb {version}…")
+        # Generous inactivity timeout: the download is ~50-100 MB
+        reply = self.network.get(self.make_request(asset["browser_download_url"], timeout=60000))
+        reply.finished.connect(lambda: self.on_update_downloaded(reply, asset, release))
+
+    def on_update_downloaded(self, reply, asset, release):
+        version = release["tag_name"]
+        try:
+            if reply.error() != QNetworkReply.NetworkError.NoError:
+                raise OSError(reply.errorString())
+            data = bytes(reply.readAll())
+            updater.verify(data, asset)
+            target = updater.install_target()
+            self.pending_update = (updater.stage(data, target), target)
+            self.show_update_message(
+                f"ARHerb {version} is ready and will be installed when you close the app.", restart=True)
+        except Exception:
+            url = release.get("html_url", "")
+            self.show_update_message(
+                f'Could not download ARHerb {version} automatically: <a href="{url}">download it here</a>')
+        finally:
+            reply.deleteLater()
+
+    def install_pending_update(self):
+        if not self.pending_update:
+            return False
+        staged, target = self.pending_update
+        self.pending_update = None
+        try:
+            updater.install(staged, target)
+            return True
+        except OSError:
+            return False
+
+    def restart_with_update(self):
+        target = self.pending_update[1] if self.pending_update else None
+        if self.install_pending_update():
+            updater.relaunch(target)
+            QApplication.instance().quit()
+        else:
+            QMessageBox.critical(self, "Update failed",
+                                 "The update could not be installed. Please download it from GitHub Releases.")
 
     def toggle_column_fields(self, visible):
         self.columns_panel.setVisible(visible)
@@ -614,6 +690,7 @@ class HerbariumApp(QWidget):
 
 
 if __name__ == "__main__":
+    updater.cleanup_leftovers()
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     window = HerbariumApp()
