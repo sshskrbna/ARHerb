@@ -4,17 +4,18 @@
 
 ## English
 
-ARHerb is a desktop application that automates the creation of labels for herbarium specimens. It turns an Excel spreadsheet into a ready-to-print Word document, optionally with QR codes linking to the collection site on Google Maps.
+ARHerb is a desktop application that automates the creation of labels for herbarium specimens. It turns an Excel spreadsheet into a ready-to-print Word document with QR codes, checks scientific names against GBIF and exports data in Darwin Core.
 
 ### Features
 
-- **Simple GUI** built with PyQt6.
-- **Print-ready Word documents** (.docx), two labels per row; a label is never split across pages.
-- **QR codes** with a Google Maps link built from the latitude/longitude columns.
+- **Print-ready Word documents** (.docx), 1–4 labels per row; a label is never split across pages.
+- **Your own label design**: make the template in Word with placeholders like `{species}` or `{qr}`, or use the built-in one.
+- **QR codes** with the collection site on Google Maps, OpenStreetMap or the phone's map app (`geo:`), plus an optional QR code with the iNaturalist observation.
+- **GBIF name check**: finds typos and synonyms in scientific names and suggests the accepted name with its author.
+- **Darwin Core export** to publish your collection to GBIF; Darwin Core column names are also understood on input.
 - **Specimen types**: fungi, bryophytes and vascular plants (vascular plants can also show Russian family and species names).
 - **Custom column mapping** if your spreadsheet uses different column names. Missing columns are reported before the document is generated.
-- **Light and dark themes**, following the system by default.
-- **Automatic updates** from GitHub Releases.
+- **Light and dark themes** and **automatic updates** from GitHub Releases.
 
 ### Download
 
@@ -37,21 +38,61 @@ Ready-made builds are on the [Releases](https://github.com/sshskrbna/ARHerb/rele
 
 <img src="docs/images/step1-open.png" width="480" alt="ARHerb main window">
 
-**2. Choose the specimen type** and, if you want, turn on QR codes. For vascular plants the Russian family and species names (`familyrus`, `speciesrus`) are added to the label.
+**2. Choose the specimen type and the QR codes.** For vascular plants the Russian family and species names (`familyrus`, `speciesrus`) are added to the label. The collection site QR code can open Google Maps, OpenStreetMap or the map app on the phone (`geo:`). Tick the iNaturalist option to add a second QR code with the observation: it needs an `inat` column with the observation number or link.
 
-<img src="docs/images/step2-fill.png" width="480" alt="File selected and label settings filled in">
+<img src="docs/images/step2-fill.png" width="480" alt="File selected, QR codes and iNaturalist turned on">
 
-**3. If your columns are named differently**, tick *My spreadsheet uses different column names* and type your names next to the standard ones. Leave a field empty to keep the default name. See [Excel format](#excel-format) for the full list.
+**3. Choose the label design** (see [Label templates](#label-templates)) and how many labels go in a row.
 
-<img src="docs/images/step3-columns.png" width="480" alt="Custom column names">
+<img src="docs/images/step3-template.png" width="480" alt="Template settings">
 
-**4. Click _Generate labels_.** The Word document is saved next to the Excel file as `<name>_output.docx`, two labels per row, ready to print and cut.
+**4. If your columns are named differently**, tick *My spreadsheet uses different column names* and type your names next to the standard ones. Leave a field empty to keep the default name. See [Excel format](#excel-format) for the full list.
 
-<img src="docs/images/step4-result.png" width="560" alt="Generated labels in Word">
+<img src="docs/images/step4-columns.png" width="480" alt="Custom column names">
+
+**5. Click _Generate labels_.** The Word document is saved next to the Excel file as `<name>_output.docx`, ready to print and cut along the dashed lines.
+
+<img src="docs/images/step5-result.png" width="600" alt="Generated labels in Word">
 
 The theme button in the top right corner switches between *Auto* (same as the system), *Light* and *Dark*.
 
 <img src="docs/images/theme-dark.png" width="480" alt="Dark theme">
+
+### Label templates
+
+A template is an ordinary Word document with the design of **one** label. ARHerb makes a copy of it for every row of the spreadsheet, replaces the placeholders with data and lays the labels out in a grid.
+
+1. Click **Make my own template from the built-in one…** and save the file: it opens in Word.
+2. Change fonts, sizes and layout, move or delete lines, add your logo or a frame. Keep the words in curly braces where the data should go.
+3. Save it. ARHerb switches to *My Word template* and uses it from then on.
+
+| Placeholder | Replaced with |
+|---|---|
+| `{herbarium}` | Herbarium name entered in the app |
+| `{family}`, `{species}` | Family and species |
+| `{familyrus}`, `{speciesrus}` | Russian names (vascular plants) |
+| `{region}`, `{point}`, `{habitats}` | Region, locality, habitat |
+| `{location}` | Region, locality and habitat joined with commas |
+| `{date}`, `{leg}`, `{det}`, `{num}` | Date, collector, identified by, specimen number |
+| `{lat}`, `{lon}`, `{coords}` | Coordinates; `{coords}` looks like `56.0153° N, 37.8471° E` |
+| `{inat}` | Link to the iNaturalist observation |
+| `{qr}`, `{inat_qr}` | QR codes: collection site and iNaturalist observation |
+
+Any other column of your spreadsheet works too, by its exact name: `{Altitude}`, `{Notes}`… A placeholder takes the formatting of its first letter, so make `{species}` italic and the species will be italic. A line that ends up empty (for example no Russian name) is removed.
+
+### GBIF: name check and Darwin Core
+
+**Check names in GBIF** looks up every distinct name of the `species` column in the [GBIF taxonomy](https://www.gbif.org/species/search) and lists:
+
+- typos (`Rosa caninna` → `Rosa canina L.`) and synonyms (`Pyrethrum parthenium` → `Tanacetum parthenium (L.) Sch.Bip.`), ticked by default;
+- missing or different authors and alternative family names (`Compositae` → `Asteraceae`), not ticked;
+- names GBIF does not know, and species whose family in the table differs from GBIF.
+
+<img src="docs/images/gbif-check.png" width="640" alt="GBIF name check results">
+
+**Save corrected copy** writes the ticked changes into a copy of your Excel file (formatting is kept, the original is not touched) and selects the copy.
+
+**Export Darwin Core (CSV)** saves the table with [Darwin Core](https://dwc.tdwg.org/terms/) columns (`scientificName`, `eventDate`, `recordedBy`, `decimalLatitude`…), ready to upload to a GBIF publishing tool such as the IPT. Enter the herbarium acronym as the herbarium name: it becomes `institutionCode` and, with the specimen number, `occurrenceID`.
 
 ### Updates
 
@@ -91,12 +132,15 @@ The first sheet is read; the first row holds column names. Default names:
 | `num` | Specimen number |
 | `N` | Latitude, decimal degrees (`55.75` or `55,75`) |
 | `E` | Longitude, decimal degrees |
+| `inat` | iNaturalist observation number or link (optional) |
+
+Darwin Core names work as well when the default column is absent: `scientificName`, `vernacularName`, `stateProvince`, `locality`, `habitat`, `eventDate`, `recordedBy`, `identifiedBy`, `catalogNumber`, `decimalLatitude`, `decimalLongitude`. Any other column can be printed through a [template](#label-templates).
 
 Empty cells are allowed. The output is saved next to the source file as `<name>_output.docx`.
 
 ### Tech stack
 
-Python, PyQt6, pandas + openpyxl, python-docx, qrcode + Pillow.
+Python, PyQt6, pandas + openpyxl, python-docx, qrcode + Pillow, GBIF API.
 
 ### Releasing
 
@@ -115,17 +159,18 @@ Found a bug or have an idea? Please open an [Issue](https://github.com/sshskrbna
 
 ## Русский
 
-ARHerb — десктопное приложение для автоматического создания этикеток гербарных образцов. Оно превращает Excel-таблицу в готовый к печати документ Word, при желании с QR-кодами, ведущими на место сбора в Google Maps.
+ARHerb — десктопное приложение для автоматического создания этикеток гербарных образцов. Оно превращает Excel-таблицу в готовый к печати документ Word с QR-кодами, проверяет латинские названия по GBIF и экспортирует данные в Darwin Core.
 
 ### Возможности
 
-- **Простой интерфейс** на PyQt6.
-- **Готовые к печати документы Word** (.docx), по две этикетки в ряд; этикетка не разрывается между страницами.
-- **QR-коды** со ссылкой на Google Maps по колонкам широты и долготы.
+- **Готовые к печати документы Word** (.docx), от 1 до 4 этикеток в ряд; этикетка не разрывается между страницами.
+- **Свой дизайн этикетки**: шаблон делается в Word с метками вроде `{species}` или `{qr}`, либо используется встроенный.
+- **QR-коды** с местом сбора в Google Maps, OpenStreetMap или в приложении карт на телефоне (`geo:`), а по желанию ещё и QR-код наблюдения в iNaturalist.
+- **Проверка названий по GBIF**: находит опечатки и синонимы и предлагает принятое название с автором.
+- **Экспорт в Darwin Core** для публикации коллекции в GBIF; колонки с названиями Darwin Core понимаются и на входе.
 - **Типы образцов**: грибы, мохообразные и сосудистые растения (для сосудистых можно выводить русские названия семейства и вида).
 - **Свои названия колонок**, если в таблице они отличаются от стандартных. Отсутствующие колонки показываются до генерации документа.
-- **Светлая и тёмная темы**, по умолчанию как в системе.
-- **Автоматические обновления** из GitHub Releases.
+- **Светлая и тёмная темы** и **автоматические обновления** из GitHub Releases.
 
 ### Скачать
 
@@ -148,21 +193,61 @@ ARHerb — десктопное приложение для автоматиче
 
 <img src="docs/images/step1-open.png" width="480" alt="Главное окно ARHerb">
 
-**2. Выберите тип образцов** и при желании включите QR-коды. Для сосудистых растений на этикетку добавляются русские названия семейства и вида (`familyrus`, `speciesrus`).
+**2. Выберите тип образцов и QR-коды.** Для сосудистых растений на этикетку добавляются русские названия семейства и вида (`familyrus`, `speciesrus`). QR-код места сбора может открывать Google Maps, OpenStreetMap или приложение карт на телефоне (`geo:`). Галочка iNaturalist добавляет второй QR-код со ссылкой на наблюдение. Для него нужна колонка `inat` с номером наблюдения или ссылкой на него.
 
-<img src="docs/images/step2-fill.png" width="480" alt="Файл выбран, настройки этикетки заполнены">
+<img src="docs/images/step2-fill.png" width="480" alt="Файл выбран, включены QR-коды и iNaturalist">
 
-**3. Если колонки в таблице называются по-другому**, отметьте *My spreadsheet uses different column names* и впишите свои названия рядом со стандартными. Пустое поле означает стандартное название. Полный список колонок есть в разделе [Формат Excel](#формат-excel).
+**3. Выберите дизайн этикетки** (см. [Шаблоны этикеток](#шаблоны-этикеток)) и сколько этикеток ставить в ряд.
 
-<img src="docs/images/step3-columns.png" width="480" alt="Свои названия колонок">
+<img src="docs/images/step3-template.png" width="480" alt="Настройки шаблона">
 
-**4. Нажмите _Generate labels_.** Документ Word сохранится рядом с Excel-файлом как `<имя>_output.docx`: по две этикетки в ряд, готово к печати и нарезке.
+**4. Если колонки в таблице называются по-другому**, отметьте *My spreadsheet uses different column names* и впишите свои названия рядом со стандартными. Пустое поле означает стандартное название. Полный список колонок есть в разделе [Формат Excel](#формат-excel).
 
-<img src="docs/images/step4-result.png" width="560" alt="Готовые этикетки в Word">
+<img src="docs/images/step4-columns.png" width="480" alt="Свои названия колонок">
+
+**5. Нажмите _Generate labels_.** Документ Word сохранится рядом с Excel-файлом как `<имя>_output.docx`: готово к печати и нарезке по пунктирным линиям.
+
+<img src="docs/images/step5-result.png" width="600" alt="Готовые этикетки в Word">
 
 Кнопка в правом верхнем углу переключает тему: *Auto* (как в системе), *Light* (светлая), *Dark* (тёмная).
 
 <img src="docs/images/theme-dark.png" width="480" alt="Тёмная тема">
+
+### Шаблоны этикеток
+
+Шаблон — обычный документ Word с дизайном **одной** этикетки. ARHerb копирует его для каждой строки таблицы, подставляет данные вместо меток и раскладывает этикетки сеткой.
+
+1. Нажмите **Make my own template from the built-in one…** и сохраните файл: он откроется в Word.
+2. Меняйте шрифты, размеры и расположение, переставляйте и удаляйте строки, добавьте логотип или рамку. Слова в фигурных скобках оставьте там, где должны стоять данные.
+3. Сохраните файл. ARHerb переключится на *My Word template* и дальше будет использовать его.
+
+| Метка | Что подставляется |
+|---|---|
+| `{herbarium}` | Название гербария из приложения |
+| `{family}`, `{species}` | Семейство и вид |
+| `{familyrus}`, `{speciesrus}` | Русские названия (сосудистые растения) |
+| `{region}`, `{point}`, `{habitats}` | Регион, пункт сбора, местообитание |
+| `{location}` | Регион, пункт и местообитание через запятую |
+| `{date}`, `{leg}`, `{det}`, `{num}` | Дата, собрал, определил, номер образца |
+| `{lat}`, `{lon}`, `{coords}` | Координаты; `{coords}` выглядит как `56.0153° N, 37.8471° E` |
+| `{inat}` | Ссылка на наблюдение в iNaturalist |
+| `{qr}`, `{inat_qr}` | QR-коды: место сбора и наблюдение iNaturalist |
+
+Подходит и любая другая колонка вашей таблицы, по точному названию: `{Altitude}`, `{Notes}`… Метка берёт оформление своей первой буквы: если сделать `{species}` курсивом, вид будет напечатан курсивом. Строка, которая после подстановки оказалась пустой (например, нет русского названия), удаляется.
+
+### GBIF: проверка названий и Darwin Core
+
+**Check names in GBIF** сверяет каждое название из колонки `species` с [таксономией GBIF](https://www.gbif.org/species/search) и показывает:
+
+- опечатки (`Rosa caninna` → `Rosa canina L.`) и синонимы (`Pyrethrum parthenium` → `Tanacetum parthenium (L.) Sch.Bip.`) — отмечены галочкой сразу;
+- отсутствующего или другого автора и альтернативные названия семейств (`Compositae` → `Asteraceae`) — без галочки;
+- названия, которых нет в GBIF, и виды, у которых семейство в таблице расходится с GBIF.
+
+<img src="docs/images/gbif-check.png" width="640" alt="Результаты проверки названий по GBIF">
+
+**Save corrected copy** записывает отмеченные исправления в копию Excel-файла. Оформление сохраняется, оригинал не меняется, а копия сразу становится выбранным файлом.
+
+**Export Darwin Core (CSV)** сохраняет таблицу с колонками [Darwin Core](https://dwc.tdwg.org/terms/) (`scientificName`, `eventDate`, `recordedBy`, `decimalLatitude`…), готовую к загрузке в инструмент публикации GBIF, например IPT. В поле названия гербария введите его акроним: он станет `institutionCode`, а вместе с номером образца — `occurrenceID`.
 
 ### Обновления
 
@@ -202,12 +287,15 @@ python main.py
 | `num` | Номер образца |
 | `N` | Широта в десятичных градусах (`55.75` или `55,75`) |
 | `E` | Долгота в десятичных градусах |
+| `inat` | Номер или ссылка на наблюдение iNaturalist (необязательно) |
+
+Если стандартной колонки нет, подходят и названия Darwin Core: `scientificName`, `vernacularName`, `stateProvince`, `locality`, `habitat`, `eventDate`, `recordedBy`, `identifiedBy`, `catalogNumber`, `decimalLatitude`, `decimalLongitude`. Любую другую колонку можно вывести через [шаблон](#шаблоны-этикеток).
 
 Пустые ячейки допускаются. Результат сохраняется рядом с исходным файлом как `<имя>_output.docx`.
 
 ### Технологии
 
-Python, PyQt6, pandas + openpyxl, python-docx, qrcode + Pillow.
+Python, PyQt6, pandas + openpyxl, python-docx, qrcode + Pillow, GBIF API.
 
 ### Выпуск новой версии
 
