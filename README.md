@@ -9,6 +9,7 @@ ARHerb is a desktop application that automates the creation of labels for herbar
 ### Features
 
 - **Print-ready Word documents** (.docx), 1–4 labels per row; a label is never split across pages.
+- **Live preview** of a label at its real size while you change the settings.
 - **Your own label design**: make the template in Word with placeholders like `{species}` or `{qr}`, or use the built-in one.
 - **QR codes** with the collection site on Google Maps, OpenStreetMap or the phone's map app (`geo:`), plus an optional QR code with the iNaturalist observation.
 - **GBIF name check**: finds typos and synonyms in scientific names and suggests the accepted name with its author.
@@ -34,21 +35,25 @@ Ready-made builds are on the [Releases](https://github.com/sshskrbna/ARHerb/rele
 
 ### How to use
 
+To try it out, download the example table [specimens-example.xlsx](docs/specimens-example.xlsx): 14 specimens with every column filled in, a few deliberate mistakes for the GBIF check and a description of the columns on the second sheet.
+
 **1. Choose the Excel file.** Click the dashed area or drag the `.xlsx` file into the window. Enter the herbarium name: it is printed in bold at the top of every label.
 
-<img src="docs/images/step1-open.png" width="480" alt="ARHerb main window">
+The **Preview** panel on the right shows one label exactly as it will be laid out in Word, at its real width. It changes as soon as you change a setting; the ‹ › buttons go through the rows of your table. Until you choose a file it shows sample data. If the template uses a placeholder your table has no column for, the preview says so above the label.
+
+<img src="docs/images/step1-open.png" width="760" alt="ARHerb main window">
 
 **2. Choose the specimen type and the QR codes.** For vascular plants the Russian family and species names (`familyrus`, `speciesrus`) are added to the label. The collection site QR code can open Google Maps, OpenStreetMap or the map app on the phone (`geo:`). Tick the iNaturalist option to add a second QR code with the observation: it needs an `inat` column with the observation number or link.
 
-<img src="docs/images/step2-fill.png" width="480" alt="File selected, QR codes and iNaturalist turned on">
+<img src="docs/images/step2-fill.png" width="760" alt="File selected, QR codes and iNaturalist turned on">
 
-**3. Choose the label design** (see [Label templates](#label-templates)) and how many labels go in a row.
+**3. Choose the label design** (see [Label templates](#label-templates)) and how many labels go in a row. The preview shows your own template too, and picks up your edits when you come back from Word.
 
-<img src="docs/images/step3-template.png" width="480" alt="Template settings">
+<img src="docs/images/step3-template.png" width="760" alt="Template settings">
 
 **4. If your columns are named differently**, tick *My spreadsheet uses different column names* and type your names next to the standard ones. Leave a field empty to keep the default name. See [Excel format](#excel-format) for the full list.
 
-<img src="docs/images/step4-columns.png" width="480" alt="Custom column names">
+<img src="docs/images/step4-columns.png" width="760" alt="Custom column names">
 
 **5. Click _Generate labels_.** The Word document is saved next to the Excel file as `<name>_output.docx`, ready to print and cut along the dashed lines.
 
@@ -56,7 +61,7 @@ Ready-made builds are on the [Releases](https://github.com/sshskrbna/ARHerb/rele
 
 The theme button in the top right corner switches between *Auto* (same as the system), *Light* and *Dark*.
 
-<img src="docs/images/theme-dark.png" width="480" alt="Dark theme">
+<img src="docs/images/theme-dark.png" width="760" alt="Dark theme">
 
 ### Label templates
 
@@ -106,7 +111,7 @@ ARHerb warns before generating if the template has placeholders it does not know
 
 The app checks GitHub Releases on every start. When a new version is out, it is downloaded in the background and installed when you close ARHerb. Click **Restart now** to install it right away.
 
-<img src="docs/images/update.png" width="480" alt="Update banner">
+<img src="docs/images/update.png" width="760" alt="Update banner">
 
 Automatic updates work for the downloaded builds. On macOS the app must be in the Applications folder (or any folder you can write to), not launched straight from Downloads. If ARHerb cannot update itself, it shows a link to the release page instead. Versions up to 1.1.3 do not have this feature yet, so download the new version manually once.
 
@@ -172,6 +177,7 @@ ARHerb — десктопное приложение для автоматиче
 ### Возможности
 
 - **Готовые к печати документы Word** (.docx), от 1 до 4 этикеток в ряд; этикетка не разрывается между страницами.
+- **Предпросмотр** этикетки в реальном размере прямо во время настройки.
 - **Свой дизайн этикетки**: шаблон делается в Word с метками вроде `{species}` или `{qr}`, либо используется встроенный.
 - **QR-коды** с местом сбора в Google Maps, OpenStreetMap или в приложении карт на телефоне (`geo:`), а по желанию ещё и QR-код наблюдения в iNaturalist.
 - **Проверка названий по GBIF**: находит опечатки и синонимы и предлагает принятое название с автором.
@@ -197,21 +203,25 @@ ARHerb — десктопное приложение для автоматиче
 
 ### Как пользоваться
 
+Чтобы попробовать, скачайте пример таблицы [specimens-example.xlsx](docs/specimens-example.xlsx): 14 образцов со всеми заполненными колонками, несколько намеренных ошибок для проверки по GBIF и описание колонок на втором листе.
+
 **1. Выберите Excel-файл.** Нажмите на область с пунктиром или перетащите `.xlsx` в окно. Введите название гербария: оно печатается жирным в шапке каждой этикетки.
 
-<img src="docs/images/step1-open.png" width="480" alt="Главное окно ARHerb">
+Панель **Preview** справа показывает одну этикетку так, как она будет выглядеть в Word, в реальную ширину. Она меняется сразу, как только вы меняете настройку, а кнопками ‹ › можно листать строки таблицы. Пока файл не выбран, показываются примеры. Если в шаблоне есть метка, для которой нет колонки в таблице, это будет написано над этикеткой.
+
+<img src="docs/images/step1-open.png" width="760" alt="Главное окно ARHerb">
 
 **2. Выберите тип образцов и QR-коды.** Для сосудистых растений на этикетку добавляются русские названия семейства и вида (`familyrus`, `speciesrus`). QR-код места сбора может открывать Google Maps, OpenStreetMap или приложение карт на телефоне (`geo:`). Галочка iNaturalist добавляет второй QR-код со ссылкой на наблюдение. Для него нужна колонка `inat` с номером наблюдения или ссылкой на него.
 
-<img src="docs/images/step2-fill.png" width="480" alt="Файл выбран, включены QR-коды и iNaturalist">
+<img src="docs/images/step2-fill.png" width="760" alt="Файл выбран, включены QR-коды и iNaturalist">
 
-**3. Выберите дизайн этикетки** (см. [Шаблоны этикеток](#шаблоны-этикеток)) и сколько этикеток ставить в ряд.
+**3. Выберите дизайн этикетки** (см. [Шаблоны этикеток](#шаблоны-этикеток)) и сколько этикеток ставить в ряд. Предпросмотр показывает и ваш собственный шаблон, а после правок в Word обновляется, как только вы вернётесь в окно ARHerb.
 
-<img src="docs/images/step3-template.png" width="480" alt="Настройки шаблона">
+<img src="docs/images/step3-template.png" width="760" alt="Настройки шаблона">
 
 **4. Если колонки в таблице называются по-другому**, отметьте *My spreadsheet uses different column names* и впишите свои названия рядом со стандартными. Пустое поле означает стандартное название. Полный список колонок есть в разделе [Формат Excel](#формат-excel).
 
-<img src="docs/images/step4-columns.png" width="480" alt="Свои названия колонок">
+<img src="docs/images/step4-columns.png" width="760" alt="Свои названия колонок">
 
 **5. Нажмите _Generate labels_.** Документ Word сохранится рядом с Excel-файлом как `<имя>_output.docx`: готово к печати и нарезке по пунктирным линиям.
 
@@ -219,7 +229,7 @@ ARHerb — десктопное приложение для автоматиче
 
 Кнопка в правом верхнем углу переключает тему: *Auto* (как в системе), *Light* (светлая), *Dark* (тёмная).
 
-<img src="docs/images/theme-dark.png" width="480" alt="Тёмная тема">
+<img src="docs/images/theme-dark.png" width="760" alt="Тёмная тема">
 
 ### Шаблоны этикеток
 
@@ -269,7 +279,7 @@ ARHerb — десктопное приложение для автоматиче
 
 При каждом запуске приложение проверяет GitHub Releases. Если вышла новая версия, она скачивается в фоне и устанавливается, когда вы закрываете ARHerb. Кнопка **Restart now** установит её сразу.
 
-<img src="docs/images/update.png" width="480" alt="Плашка обновления">
+<img src="docs/images/update.png" width="760" alt="Плашка обновления">
 
 Автообновление работает в скачанных сборках. На macOS приложение должно лежать в «Программах» (или в любой папке, куда у вас есть права на запись), а не запускаться прямо из «Загрузок». Если ARHerb не может обновиться сам, он покажет ссылку на страницу релиза. В версиях до 1.1.3 включительно этой функции ещё нет, поэтому новую версию один раз нужно скачать вручную.
 
