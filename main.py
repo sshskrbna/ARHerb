@@ -26,7 +26,7 @@ import updater
 from labels import FIELDS
 
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 # The environment override exists only to test updates against a local server
 RELEASES_URL = os.environ.get(
     "ARHERB_RELEASES_URL", "https://api.github.com/repos/sshskrbna/ARHerb/releases/latest")
